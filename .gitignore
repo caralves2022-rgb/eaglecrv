@@ -1,0 +1,22 @@
+# ПРИВАТНЫЕ ДАННЫЕ (Никогда не пушим на GitHub)
+.env
+*.db
+*.sqlite
+
+# Python системные файлы
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# IDE и OS специфичные файлы
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log

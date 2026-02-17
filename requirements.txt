@@ -1,0 +1,8 @@
+web3
+pandas
+streamlit
+plotly
+psycopg2-binary
+python-dotenv
+requests
+schedule
