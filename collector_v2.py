@@ -106,7 +106,8 @@ def get_alpha_and_fees():
                 
                 total_unclaimed_usd += (usd_x + usd_y)
                 
-                cursor.execute("INSERT INTO lending_markets (timestamp, controller_address, amm_address, market_name, active_band, p_oracle, base_price, band_proximity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                placeholder = "?" if db_type == "sqlite" else "%s"
+                cursor.execute(f"INSERT INTO lending_markets (timestamp, controller_address, amm_address, market_name, active_band, p_oracle, base_price, band_proximity) VALUES ({','.join([placeholder]*8)})",
                                (now, ctrl_addr, amm_addr, f"{i} Market", int(active_band), float(p_oracle), float(p_band_up), float(prox)))
             except: pass
     except: pass
@@ -122,7 +123,8 @@ def get_alpha_and_fees():
 
     # Final Revenue Record
     total_combined = total_collector_usd + total_unclaimed_usd
-    cursor.execute("INSERT INTO fee_velocity (timestamp, pool_address, pool_name, admin_fee_balance, token_symbol) VALUES (?, ?, ?, ?, ?)",
+    placeholder = "?" if db_type == "sqlite" else "%s"
+    cursor.execute(f"INSERT INTO fee_velocity (timestamp, pool_address, pool_name, admin_fee_balance, token_symbol) VALUES ({','.join([placeholder]*5)})",
                    (now, FEE_COLLECTOR, "INSTITUTIONAL_PENDING_REVENUE", float(total_combined), "USD"))
     
     print(f"  Stockpile: ${total_collector_usd:,.2f} | Stuck in AMMs: ${total_unclaimed_usd:,.2f}")
@@ -149,7 +151,8 @@ def get_classic_pools():
                 total_usd += val
             for i, symbol in enumerate(info["tokens"]):
                 perc = (balances[i] / total_usd * 100) if total_usd > 0 else 0
-                cursor.execute("INSERT INTO pool_balances (timestamp, pool_name, token_symbol, balance, percentage) VALUES (?, ?, ?, ?, ?)",
+                placeholder = "?" if db_type == "sqlite" else "%s"
+                cursor.execute(f"INSERT INTO pool_balances (timestamp, pool_name, token_symbol, balance, percentage) VALUES ({','.join([placeholder]*5)})",
                                (now, name, symbol, balances[i], perc))
             print(f"  [+] {name} updated.")
         except: pass
@@ -268,10 +271,11 @@ def check_arbi_opportunities():
 
                 is_profitable = 1 if net_profit > 0 else 0
 
+                placeholder = "?" if db_type == "sqlite" else "%s"
                 cursor.execute(
-                    "INSERT INTO arbi_opportunities (timestamp, market_name, collateral_symbol, "
+                    f"INSERT INTO arbi_opportunities (timestamp, market_name, collateral_symbol, "
                     "curve_price_usd, market_price_usd, discount_pct, est_profit_per_1k, "
-                    "gas_cost_usd, is_profitable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "gas_cost_usd, is_profitable) VALUES ({','.join([placeholder]*9)})",
                     (now, f"{info['symbol']} Market", info['symbol'],
                      float(curve_price), float(market_price), float(discount_pct),
                      float(net_profit), float(gas_cost * 2), is_profitable)
