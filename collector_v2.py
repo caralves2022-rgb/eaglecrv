@@ -189,52 +189,79 @@ def get_classic_pools():
     conn.close()
 
 def check_arbi_opportunities():
-    print("[v4.0] Checking Arbitrage...")
+    print("[v4.9] Checking Arbitrage...")
     from db import get_db_connection
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
     now = time.strftime('%Y-%m-%d %H:%M:%S')
-    gas_cost = get_gas_cost_usd()
     ph = "?" if db_type == "sqlite" else "%s"
+    
     try:
         factory = w3.eth.contract(address=w3.to_checksum_address(LLAMALEND_FACTORY), abi=LLAMALEND_FACTORY_ABI)
         n_collat = factory.functions.n_collaterals().call()
+        
+        # 1. First, gather all CG IDs to fetch in batch
+        cg_ids = set()
+        markets_to_check = []
         for i in range(n_collat):
             try:
                 collat_addr = factory.functions.collaterals(i).call()
                 ctrl_addr = factory.functions.get_controller(collat_addr).call()
-                ctrl = w3.eth.contract(address=ctrl_addr, abi=CONTROLLER_ABI)
-                amm_addr = ctrl.functions.amm().call()
-                amm = w3.eth.contract(address=amm_addr, abi=AMM_ABI)
-                p_band_up = amm.functions.p_oracle_up(amm.functions.active_band().call()).call() / 1e18
-                # Fallback for unknown tokens
+                if ctrl_addr == "0x0000000000000000000000000000000000000000": continue
+                
                 info = COLLATERAL_INFO.get(collat_addr)
-                if info:
-                    symbol = info.get("symbol", "Unknown")
-                    cg_id = info.get("coingecko", "ethereum")
-                else:
+                if not info:
                     try:
                         token_contract = w3.eth.contract(address=w3.to_checksum_address(collat_addr), abi=ERC20_ABI)
                         symbol = token_contract.functions.symbol().call()
+                        cg_id = "ethereum" # default fallback
                     except:
                         symbol = "Unknown"
-                    cg_id = "ethereum"
+                        cg_id = "ethereum"
+                else:
+                    symbol = info["symbol"]
+                    cg_id = info["coingecko"]
+
+                cg_ids.add(cg_id)
+                markets_to_check.append({
+                    "id": i, "addr": collat_addr, "ctrl": ctrl_addr, "symbol": symbol, "cg_id": cg_id
+                })
+            except: pass
+
+        # 2. Batch fetch prices
+        all_prices = {}
+        if cg_ids:
+            try:
+                ids_str = ",".join(cg_ids)
+                r = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={ids_str}&vs_currencies=usd", timeout=10)
+                res = r.json()
+                for cid in cg_ids:
+                    all_prices[cid] = res.get(cid, {}).get('usd', 0)
+            except: print("  CG Batch Price Fetch Failed")
+
+        gas_cost = get_gas_cost_usd()
+
+        # 3. Process each market
+        for m in markets_to_check:
+            try:
+                ctrl = w3.eth.contract(address=m["ctrl"], abi=CONTROLLER_ABI)
+                amm_addr = ctrl.functions.amm().call()
+                amm = w3.eth.contract(address=amm_addr, abi=AMM_ABI)
+                p_band_up = amm.functions.p_oracle_up(amm.functions.active_band().call()).call() / 1e18
                 
-                try:
-                    market_price = get_market_price_coingecko(cg_id)
-                except:
-                    market_price = 0
+                market_price = all_prices.get(m["cg_id"], 0)
                 
-                if market_price > 0:
+                if market_price > 0 and p_band_up > 0:
                     discount_pct = ((market_price - p_band_up) / market_price) * 100
                     net_profit = ((1000.0 / p_band_up) * market_price - 1000.0) - (gas_cost * 2)
                     
                     cursor.execute(f"INSERT INTO arbi_opportunities (timestamp, market_name, collateral_symbol, curve_price_usd, market_price_usd, discount_pct, est_profit_per_1k, gas_cost_usd, is_profitable) VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})",
-                        (now, f"Market #{i}", symbol, float(p_band_up), float(market_price), float(discount_pct), float(net_profit), float(gas_cost * 2), 1 if net_profit > 0 else 0))
+                        (now, f"Market #{m['id']}", m["symbol"], float(p_band_up), float(market_price), float(discount_pct), float(net_profit), float(gas_cost * 2), 1 if net_profit > 0 else 0))
             except Exception as e:
-                print(f"Skipping Arbi Market #{i} due to Error: {e}")
-                pass
-    except: pass
+                print(f"Skipping Market #{m['id']}: {e}")
+    except Exception as e:
+        print(f"Arbi Scan Critical Failure: {e}")
+    
     conn.commit()
     conn.close()
 
