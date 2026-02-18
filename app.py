@@ -72,15 +72,15 @@ st.sidebar.markdown("""
 
 def get_data(table, limit=100):
     from db import get_db_connection
-    conn, db_type = get_db_connection()
     try:
+        conn, db_type = get_db_connection()
         df = pd.read_sql(f"SELECT * FROM {table} ORDER BY timestamp DESC LIMIT {limit}", conn)
+        conn.close()
         return df, db_type
     except Exception as e:
-        st.error(f"DB Error ({db_type}): {e}")
-        return pd.DataFrame(), db_type
-    finally:
-        conn.close()
+        # Теперь мы увидим реальную причину (Timeout, Auth Failed и т.д.)
+        st.error(f"🔴 Connection Error: {e}")
+        return pd.DataFrame(), "offline"
 
 mode = st.sidebar.radio("Analysis Mode", [
     "📡 Liquidation Radar",
