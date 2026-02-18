@@ -130,7 +130,7 @@ if mode == "📡 Liquidation Radar":
         fig = px.bar(df_latest, x='market_name', y='band_proximity', color='band_proximity',
                      color_continuous_scale="RdYlGn_r", template="plotly_dark", height=300,
                      title="Market Health (Higher = Safer)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # 2. Show Live Feed with Airport Effect
         st.subheader("Live Market Feed")
@@ -138,8 +138,13 @@ if mode == "📡 Liquidation Radar":
             m_df = df[df['market_name'] == market].sort_values('timestamp', ascending=False)
             row = m_df.iloc[0]
             prox = row['band_proximity']
-            ts_str = str(row['timestamp'])
-            ts = ts_str.split(' ')[1] if ' ' in ts_str else ts_str # Handle both full and time-only formats
+            # Safe handling of timestamp object
+            try:
+                ts_dt = pd.to_datetime(row['timestamp'])
+                ts = ts_dt.strftime('%H:%M:%S')
+            except:
+                ts_str = str(row['timestamp'])
+                ts = ts_str.split(' ')[1] if ' ' in ts_str else ts_str
             
             if prox < 0:
                 st.markdown(f'<div class="alert-arb status-alert">⚠️ [{ts}] ARBITRAGE: {market} at {prox:.2f}%. Buy discount asset in Pool. <a href="https://curve.fi/#/ethereum/swap" class="swap-btn" target="_blank">SWAP UI</a></div>', unsafe_allow_html=True)
@@ -167,8 +172,13 @@ elif mode == "💰 Arbitrage Checker":
             verdict = "PROFITABLE" if profitable else "NOT PROFITABLE"
             market_label = f"{row['collateral_symbol']} ({row['market_name']})"
 
-            ts_str = str(row['timestamp'])
-            ts_display = ts_str.split(' ')[1] if ' ' in ts_str else ts_str
+            # Safe handling of timestamp object
+            try:
+                ts_dt = pd.to_datetime(row['timestamp'])
+                ts_display = ts_dt.strftime('%H:%M:%S')
+            except:
+                ts_str = str(row['timestamp'])
+                ts_display = ts_str.split(' ')[1] if ' ' in ts_str else ts_str
 
             st.markdown(f"""
             <div class="arbi-card {card_class}">
@@ -245,4 +255,4 @@ elif mode == "💎 Revenue Alpha":
 st.sidebar.markdown("---")
 if st.sidebar.button("Refresh"): st.rerun()
 st.sidebar.info("System Status: Operational")
-st.sidebar.caption(f"Engine v4.1 | {time.strftime('%H:%M:%S')}")
+st.sidebar.caption(f"Engine v4.4 | {time.strftime('%H:%M:%S')}")
