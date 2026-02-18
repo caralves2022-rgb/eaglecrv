@@ -108,17 +108,24 @@ if db_t != "postgres":
 
 if mode == "📡 Liquidation Radar":
     st.header("📡 Institutional Alpha: LlamaLend Radar")
-    df, _ = get_data("lending_markets")
+    df, _ = get_data("lending_markets", limit=200)
     if not df.empty:
-        latest = df[df['timestamp'] == df['timestamp'].iloc[0]]
-        for _, row in latest.iterrows():
+        # Group by market and show history
+        markets = df['market_name'].unique()
+        for market in markets:
+            m_df = df[df['market_name'] == market].sort_values('timestamp', ascending=False)
+            row = m_df.iloc[0]
             prox = row['band_proximity']
+            ts = row['timestamp']
+            
             if prox < 0:
-                st.markdown(f'<div class="alert-arb">⚠️ ARBITRAGE OPPORTUNITY: {row["market_name"]} at {prox:.2f}%. Buy discount asset in Pool. <a href="https://curve.fi/#/ethereum/swap" class="swap-btn" target="_blank">SWAP UI</a></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="alert-arb">⚠️ [{ts}] ARBITRAGE: {market} at {prox:.2f}%. Buy discount asset in Pool. <a href="https://curve.fi/#/ethereum/swap" class="swap-btn" target="_blank">SWAP UI</a></div>', unsafe_allow_html=True)
             elif prox < 5.0:
-                st.markdown(f'<div class="alert-lend">⚡ HIGH YIELD LENDING: {row["market_name"]} at {prox:.2f}%. Borrow rates spiking. Supply crvUSD now!</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="alert-lend">⚡ [{ts}] HIGH YIELD: {market} at {prox:.2f}%. Borrow rates spiking. Supply crvUSD now!</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="alert-safe">✅ STABLE: {row["market_name"]} (+{prox:.2f}%). Safe for LP / Lending.</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="alert-safe">✅ [{ts}] STABLE: {market} (+{prox:.2f}%). Safe for LP / Lending.</div>', unsafe_allow_html=True)
+    else:
+        st.info("Waiting for first data cycle from Collector v4.0...")
 
         fig = px.bar(latest, x='market_name', y='band_proximity', color='band_proximity',
                      color_continuous_scale="RdYlGn_r", template="plotly_dark", height=400)
@@ -164,25 +171,31 @@ elif mode == "🌊 Liquidity & Peg":
         st.subheader("3Pool Composition (USDT Dominance Check)")
         three_pool = df_bal[df_bal['pool_name'] == '3Pool']
         if not three_pool.empty:
-            latest_3p = three_pool[three_pool['timestamp'] == three_pool['timestamp'].iloc[0]]
+            latest_3p = three_pool.sort_values('timestamp', ascending=False).iloc[:3] # Latest per token
             fig_3p = px.bar(latest_3p, y="pool_name", x="percentage", color="token_symbol",
                             text="percentage", text_auto='.2f',
                             orientation='h', template="plotly_dark", height=200,
                             color_discrete_sequence=["#58a6ff", "#3fb950", "#f2cc60", "#f85149"])
             fig_3p.update_traces(textposition='inside')
             st.plotly_chart(fig_3p, width='stretch')
+        else:
+            st.info("3Pool data pending...")
         
         # crvUSD/USDC Composition
         st.subheader("crvUSD/USDC Peg Health")
         crvusd_p = df_bal[df_bal['pool_name'] == 'crvUSD/USDC']
         if not crvusd_p.empty:
-            latest_cv = crvusd_p[crvusd_p['timestamp'] == crvusd_p['timestamp'].iloc[0]]
+            latest_cv = crvusd_p.sort_values('timestamp', ascending=False).iloc[:2]
             fig_cv = px.bar(latest_cv, y="pool_name", x="percentage", color="token_symbol",
                             text="percentage", text_auto='.2f',
                             orientation='h', template="plotly_dark", height=200,
-                            color_discrete_map={"crvUSD": "#58a6ff", "USDC": "#3fb950"})
+                            color_discrete_sequence=["#3fb950", "#58a6ff"])
             fig_cv.update_traces(textposition='inside')
             st.plotly_chart(fig_cv, width='stretch')
+        else:
+            st.info("crvUSD Peg data pending...")
+    else:
+        st.info("Waiting for collector to populate pool_balances table in Supabase...")
 
 elif mode == "💎 Revenue Alpha":
     st.header("💎 Combined Global Revenue (Institutional Grade)")
