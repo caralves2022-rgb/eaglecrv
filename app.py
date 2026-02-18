@@ -3,7 +3,11 @@ import pandas as pd
 import plotly.express as px
 import sqlite3
 import time
+import warnings
 from db import DB_PATH
+
+# Silence the SQLAlchemy/Pandas warning (non-critical for this dashboard)
+warnings.filterwarnings("ignore", category=UserWarning, module="pandas")
 
 st.set_page_config(page_title="EagleCurve 2.0 | ALPHA TERMINAL", page_icon="🦅", layout="wide") # Premium Style 2.0
 st.markdown("""
@@ -255,4 +259,4 @@ elif mode == "💎 Revenue Alpha":
 st.sidebar.markdown("---")
 if st.sidebar.button("Refresh"): st.rerun()
 st.sidebar.info("System Status: Operational")
-st.sidebar.caption(f"Engine v4.4 | {time.strftime('%H:%M:%S')}")
+st.sidebar.caption(f"Engine v4.5 | {time.strftime('%H:%M:%S')}")
