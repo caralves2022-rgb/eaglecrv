@@ -90,8 +90,9 @@ def get_gas_cost_usd():
     except: return 5.0
 
 def get_alpha_and_fees():
-    print("Scanning Pre-Collector Alpha (Internal AMM Fees)...")
-    from db import get_db_connection
+    print("[VERSION 3.1 ACTIVE] Scanning Pre-Collector Alpha...")
+    from db import get_db_connection, init_db
+    init_db() # Ensure tables exist
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
     now = time.strftime('%Y-%m-%d %H:%M:%S')

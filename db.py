@@ -21,11 +21,11 @@ def get_db_connection():
     return conn, "sqlite"
 
 def init_db():
+    """Initializes the database schema if tables are missing."""
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
     
-    # helper for cross-db types
-    TEXT_TYPE = "TEXT" if db_type == "sqlite" else "TEXT"
+    TEXT_TYPE = "TEXT"
     REAL_TYPE = "REAL" if db_type == "sqlite" else "DOUBLE PRECISION"
     TIMESTAMP_TYPE = "DATETIME DEFAULT CURRENT_TIMESTAMP" if db_type == "sqlite" else "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
 
@@ -37,12 +37,6 @@ def init_db():
             balance {REAL_TYPE},
             percentage {REAL_TYPE},
             eth_price {REAL_TYPE}
-        )''',
-        f'''CREATE TABLE IF NOT EXISTS gauge_weights (
-            timestamp {TIMESTAMP_TYPE},
-            gauge_address {TEXT_TYPE},
-            pool_name {TEXT_TYPE},
-            weight {REAL_TYPE}
         )''',
         f'''CREATE TABLE IF NOT EXISTS fee_velocity (
             timestamp {TIMESTAMP_TYPE},
@@ -60,18 +54,6 @@ def init_db():
             p_oracle {REAL_TYPE},
             base_price {REAL_TYPE},
             band_proximity {REAL_TYPE}
-        )''',
-        f'''CREATE TABLE IF NOT EXISTS bribe_efficiency (
-            timestamp {TIMESTAMP_TYPE},
-            pool_name {TEXT_TYPE},
-            bribe_usd {REAL_TYPE},
-            votes {REAL_TYPE},
-            efficiency {REAL_TYPE}
-        )''',
-        f'''CREATE TABLE IF NOT EXISTS dune_cache (
-            query_name {TEXT_TYPE} PRIMARY KEY,
-            data_json {TEXT_TYPE},
-            last_updated {TIMESTAMP_TYPE}
         )''',
         f'''CREATE TABLE IF NOT EXISTS arbi_opportunities (
             timestamp {TIMESTAMP_TYPE},
@@ -91,7 +73,7 @@ def init_db():
     
     conn.commit()
     conn.close()
-    print(f"Database ({db_type}) initialized.")
+    print(f"Database ({db_type}) schema checked/initialized.")
 
 if __name__ == "__main__":
     init_db()
