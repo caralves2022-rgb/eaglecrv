@@ -122,8 +122,12 @@ def get_alpha_and_fees():
                 usd_y = (fees_y / 1e18) * prices.get(collat_addr, 0)
                 total_unclaimed_usd += (usd_x + usd_y)
                 
+                info = COLLATERAL_INFO.get(collat_addr, {"symbol": "Unknown"})
+                symbol = info.get("symbol", "Unknown")
+                m_name = f"{symbol} (Market #{i})"
+
                 cursor.execute(f"INSERT INTO lending_markets (timestamp, controller_address, amm_address, market_name, active_band, p_oracle, base_price, band_proximity) VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})",
-                               (now, ctrl_addr, amm_addr, f"{i} Market", int(active_band), float(p_oracle), float(p_band_up), float(prox)))
+                               (now, ctrl_addr, amm_addr, m_name, int(active_band), float(p_oracle), float(p_band_up), float(prox)))
             except: pass
     except: pass
 
