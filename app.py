@@ -82,6 +82,13 @@ def get_data(table, limit=100):
         st.error(f"🔴 Connection Error: {e}")
         return pd.DataFrame(), "offline"
 
+mode = st.sidebar.radio("Analysis Mode", [
+    "📡 Liquidation Radar",
+    "💰 Arbitrage Checker",
+    "🌊 Liquidity & Peg",
+    "💎 Revenue Alpha"
+])
+
 # DB Status Indicator
 try:
     df_status, db_t = get_data("pool_balances", limit=1)
