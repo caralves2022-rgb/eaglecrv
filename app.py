@@ -138,7 +138,8 @@ if mode == "📡 Liquidation Radar":
             m_df = df[df['market_name'] == market].sort_values('timestamp', ascending=False)
             row = m_df.iloc[0]
             prox = row['band_proximity']
-            ts = row['timestamp'].split(' ')[1] # Just time
+            ts_str = str(row['timestamp'])
+            ts = ts_str.split(' ')[1] if ' ' in ts_str else ts_str # Handle both full and time-only formats
             
             if prox < 0:
                 st.markdown(f'<div class="alert-arb status-alert">⚠️ [{ts}] ARBITRAGE: {market} at {prox:.2f}%. Buy discount asset in Pool. <a href="https://curve.fi/#/ethereum/swap" class="swap-btn" target="_blank">SWAP UI</a></div>', unsafe_allow_html=True)
@@ -166,12 +167,15 @@ elif mode == "💰 Arbitrage Checker":
             verdict = "PROFITABLE" if profitable else "NOT PROFITABLE"
             market_label = f"{row['collateral_symbol']} ({row['market_name']})"
 
+            ts_str = str(row['timestamp'])
+            ts_display = ts_str.split(' ')[1] if ' ' in ts_str else ts_str
+
             st.markdown(f"""
             <div class="arbi-card {card_class}">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; align-items: baseline; gap: 8px;">
                         <h3 style="margin:0; color: #f0f6fc;">{market_label}</h3>
-                        <span style="font-size: 11px; color: #8b949e;">updated {row['timestamp'].split(' ')[1]}</span>
+                        <span style="font-size: 11px; color: #8b949e;">updated {ts_display}</span>
                     </div>
                     <span class="profit-badge {badge_class}">{verdict}: {badge_text}</span>
                 </div>
