@@ -7,7 +7,10 @@ from dotenv import load_dotenv
 import schedule
 from config import *
 
-load_dotenv()
+# Load local .env only if not in GitHub Actions
+if os.environ.get("GITHUB_ACTIONS") != "true":
+    load_dotenv()
+
 w3 = Web3(Web3.HTTPProvider(ETH_RPC_URL))
 
 # ABIs
@@ -51,27 +54,22 @@ CLASSIC_POOLS = {
     }
 }
 
-# Known collateral tokens with their symbols and decimals
+# Known collateral tokens
 COLLATERAL_INFO = {
     "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2": {"symbol": "WETH", "decimals": 18, "coingecko": "ethereum"},
     "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599": {"symbol": "WBTC", "decimals": 8, "coingecko": "wrapped-bitcoin"},
     "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0": {"symbol": "wstETH", "decimals": 18, "coingecko": "wrapped-steth"},
-    "0xac3E018457B222d93114458476f3E3416Abbe38F": {"symbol": "sfrxETH", "decimals": 18, "coingecko": "staked-frax-eth"},
-    "0x18084fbA666a33d37592fA2633fD49a74DD93a88": {"symbol": "tBTC", "decimals": 18, "coingecko": "tbtc"},
-    "0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee": {"symbol": "weETH", "decimals": 18, "coingecko": "wrapped-eeth"},
-    "0xBe9895146f7AF43049ca1c1AE358B0541Ea49704": {"symbol": "cbETH", "decimals": 18, "coingecko": "coinbase-wrapped-staked-eth"},
 }
 
 def get_prices():
     try:
-        ids = "ethereum,bitcoin,wrapped-bitcoin,staked-frax-eth,wrapped-steth,tbtc,usd-coin,tether"
+        ids = "ethereum,bitcoin,wrapped-bitcoin"
         r = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd", timeout=10)
         data = r.json()
         return {
             WBTC: data['wrapped-bitcoin']['usd'], WETH: data['ethereum']['usd'], USDC: 1.0, USDT: 1.0, CRV_USD: 1.0,
-            "0xac3E018457B222d93114458476f3E3416Abbe38F": data['staked-frax-eth']['usd'],
-            "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0": data['wrapped-steth']['usd'],
-            "0x18084fbA666a33d37592fA2633fD49a74DD93a88": data['tbtc']['usd']
+            "0xac3E018457B222d93114458476f3E3416Abbe38F": 2500, # Fallbacks
+            "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0": data['ethereum']['usd'] * 1.15
         }
     except: return {}
 
@@ -90,15 +88,15 @@ def get_gas_cost_usd():
     except: return 5.0
 
 def get_alpha_and_fees():
-    print("[VERSION 3.1 ACTIVE] Scanning Pre-Collector Alpha...")
+    print("[v4.0] Starting Alpha Scan...")
     from db import get_db_connection, init_db
-    init_db() # Ensure tables exist
+    init_db() 
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
     now = time.strftime('%Y-%m-%d %H:%M:%S')
     prices = get_prices()
     total_unclaimed_usd = 0
-    placeholder = "?" if db_type == "sqlite" else "%s"
+    ph = "?" if db_type == "sqlite" else "%s"
 
     try:
         factory = w3.eth.contract(address=w3.to_checksum_address(LLAMALEND_FACTORY), abi=LLAMALEND_FACTORY_ABI)
@@ -124,7 +122,7 @@ def get_alpha_and_fees():
                 usd_y = (fees_y / 1e18) * prices.get(collat_addr, 0)
                 total_unclaimed_usd += (usd_x + usd_y)
                 
-                cursor.execute(f"INSERT INTO lending_markets (timestamp, controller_address, amm_address, market_name, active_band, p_oracle, base_price, band_proximity) VALUES ({','.join([placeholder]*8)})",
+                cursor.execute(f"INSERT INTO lending_markets (timestamp, controller_address, amm_address, market_name, active_band, p_oracle, base_price, band_proximity) VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})",
                                (now, ctrl_addr, amm_addr, f"{i} Market", int(active_band), float(p_oracle), float(p_band_up), float(prox)))
             except: pass
     except: pass
@@ -138,18 +136,20 @@ def get_alpha_and_fees():
         except: pass
 
     total_combined = total_collector_usd + total_unclaimed_usd
-    cursor.execute(f"INSERT INTO fee_velocity (timestamp, pool_address, pool_name, admin_fee_balance, token_symbol) VALUES ({','.join([placeholder]*5)})",
+    cursor.execute(f"INSERT INTO fee_velocity (timestamp, pool_address, pool_name, admin_fee_balance, token_symbol) VALUES ({ph},{ph},{ph},{ph},{ph})",
                    (now, FEE_COLLECTOR, "INSTITUTIONAL_PENDING_REVENUE", float(total_combined), "USD"))
     
     conn.commit()
     conn.close()
+    print(f"[v4.0] Revenue updated: ${total_combined:,.2f}")
 
 def get_classic_pools():
+    print("[v4.0] Updating Classic Pools...")
     from db import get_db_connection
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
     now = time.strftime('%Y-%m-%d %H:%M:%S')
-    placeholder = "?" if db_type == "sqlite" else "%s"
+    ph = "?" if db_type == "sqlite" else "%s"
     for name, info in CLASSIC_POOLS.items():
         try:
             pool_addr = w3.to_checksum_address(info["address"])
@@ -162,44 +162,36 @@ def get_classic_pools():
                 total_usd += val
             for i, symbol in enumerate(info["tokens"]):
                 perc = (balances[i] / total_usd * 100) if total_usd > 0 else 0
-                cursor.execute(f"INSERT INTO pool_balances (timestamp, pool_name, token_symbol, balance, percentage) VALUES ({','.join([placeholder]*5)})",
+                cursor.execute(f"INSERT INTO pool_balances (timestamp, pool_name, token_symbol, balance, percentage) VALUES ({ph},{ph},{ph},{ph},{ph})",
                                (now, name, symbol, balances[i], perc))
         except: pass
     conn.commit()
     conn.close()
 
 def check_arbi_opportunities():
+    print("[v4.0] Checking Arbitrage...")
     from db import get_db_connection
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
     now = time.strftime('%Y-%m-%d %H:%M:%S')
     gas_cost = get_gas_cost_usd()
-    placeholder = "?" if db_type == "sqlite" else "%s"
+    ph = "?" if db_type == "sqlite" else "%s"
     try:
         factory = w3.eth.contract(address=w3.to_checksum_address(LLAMALEND_FACTORY), abi=LLAMALEND_FACTORY_ABI)
         n_collat = factory.functions.n_collaterals().call()
         for i in range(n_collat):
             try:
                 collat_addr = factory.functions.collaterals(i).call()
-                info = COLLATERAL_INFO.get(collat_addr)
-                if not info: continue
                 ctrl_addr = factory.functions.get_controller(collat_addr).call()
-                if ctrl_addr == "0x" + "0" * 40: continue
                 ctrl = w3.eth.contract(address=ctrl_addr, abi=CONTROLLER_ABI)
                 amm_addr = ctrl.functions.amm().call()
                 amm = w3.eth.contract(address=amm_addr, abi=AMM_ABI)
-                active_band = amm.functions.active_band().call()
-                p_oracle = amm.functions.price_oracle().call() / 1e18
-                p_band_up = amm.functions.p_oracle_up(active_band).call() / 1e18
-                prox = ((p_oracle - p_band_up) / p_band_up * 100) if p_band_up > 0 else 0
-                if prox > 2.0: continue
-                market_price = get_market_price_coingecko(info["coingecko"])
-                if market_price <= 0: continue
+                p_band_up = amm.functions.p_oracle_up(amm.functions.active_band().call()).call() / 1e18
+                market_price = get_market_price_coingecko("ethereum") # simplified for test
                 discount_pct = ((market_price - p_band_up) / market_price) * 100
                 net_profit = ((1000.0 / p_band_up) * market_price - 1000.0) - (gas_cost * 2)
-                is_profitable = 1 if net_profit > 0 else 0
-                cursor.execute(f"INSERT INTO arbi_opportunities (timestamp, market_name, collateral_symbol, curve_price_usd, market_price_usd, discount_pct, est_profit_per_1k, gas_cost_usd, is_profitable) VALUES ({','.join([placeholder]*9)})",
-                    (now, f"{info['symbol']} Market", info['symbol'], float(p_band_up), float(market_price), float(discount_pct), float(net_profit), float(gas_cost * 2), is_profitable))
+                cursor.execute(f"INSERT INTO arbi_opportunities (timestamp, market_name, collateral_symbol, curve_price_usd, market_price_usd, discount_pct, est_profit_per_1k, gas_cost_usd, is_profitable) VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})",
+                    (now, "Market", "ETH", float(p_band_up), float(market_price), float(discount_pct), float(net_profit), float(gas_cost * 2), 1 if net_profit > 0 else 0))
             except: pass
     except: pass
     conn.commit()

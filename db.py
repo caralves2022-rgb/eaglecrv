@@ -1,7 +1,8 @@
+import os
+import time
 import sqlite3
 import psycopg2
 from urllib.parse import urlparse
-import os
 from config import SUPABASE_URL
 
 DB_PATH = "curve_data.db"
@@ -11,7 +12,7 @@ def get_db_connection():
     if SUPABASE_URL and "supabase.co" in SUPABASE_URL:
         try:
             parsed = urlparse(SUPABASE_URL)
-            print(f"Connecting to Postgres at {parsed.hostname}...")
+            print(f"Connecting to Postgres at {parsed.hostname} (Port: {parsed.port})...")
             conn = psycopg2.connect(SUPABASE_URL)
             return conn, "postgres"
         except Exception as e:
@@ -21,10 +22,10 @@ def get_db_connection():
     return conn, "sqlite"
 
 def init_db():
-    """Initializes the database schema if tables are missing."""
     conn, db_type = get_db_connection()
     cursor = conn.cursor()
     
+    # helper for cross-db types
     TEXT_TYPE = "TEXT"
     REAL_TYPE = "REAL" if db_type == "sqlite" else "DOUBLE PRECISION"
     TIMESTAMP_TYPE = "DATETIME DEFAULT CURRENT_TIMESTAMP" if db_type == "sqlite" else "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
@@ -73,7 +74,7 @@ def init_db():
     
     conn.commit()
     conn.close()
-    print(f"Database ({db_type}) schema checked/initialized.")
+    print(f"Database ({db_type}) schema checked.")
 
 if __name__ == "__main__":
     init_db()
