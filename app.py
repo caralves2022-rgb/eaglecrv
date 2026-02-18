@@ -82,18 +82,22 @@ def get_data(table, limit=100):
         st.error(f"🔴 Connection Error: {e}")
         return pd.DataFrame(), "offline"
 
-mode = st.sidebar.radio("Analysis Mode", [
-    "📡 Liquidation Radar",
-    "💰 Arbitrage Checker",
-    "🌊 Liquidity & Peg",
-    "💎 Revenue Alpha"
-])
-
 # DB Status Indicator
-conn_test, db_t = get_data("pool_balances", limit=1)
-st.sidebar.markdown(f"**DB Backend:** `{db_t.upper()}`")
-if db_t == "sqlite":
-    st.sidebar.warning("Cloud DB not connected. Using local data.")
+try:
+    df_status, db_t = get_data("pool_balances", limit=1)
+except:
+    df_status, db_t = pd.DataFrame(), "error"
+
+status_color = "#3fb950" if db_t == "postgres" else "#f85149"
+st.sidebar.markdown(f"""
+<div style='padding:10px; border-radius:5px; border:1px solid {status_color}; background:rgba(0,0,0,0.2)'>
+    <div style='font-size:10px; color:#8b949e'>DB BACKEND</div>
+    <div style='font-weight:bold; color:{status_color}'>{db_t.upper()}</div>
+</div>
+""", unsafe_allow_html=True)
+
+if db_t != "postgres":
+    st.sidebar.warning("⚠️ Cloud DB not connected. Go to Settings -> Secrets.")
 
 if mode == "📡 Liquidation Radar":
     st.header("📡 Institutional Alpha: LlamaLend Radar")
@@ -178,16 +182,19 @@ elif mode == "💎 Revenue Alpha":
     st.markdown("Formula: `FeeCollector Balance` + `Internal AMM Fees (Stuck in Contracts)`")
     
     df, _ = get_data("fee_velocity", limit=200)
-    df_rev = df[df['pool_name'] == 'INSTITUTIONAL_PENDING_REVENUE'].sort_values('timestamp')
-    if not df_rev.empty:
-        current = df_rev['admin_fee_balance'].iloc[-1]
-        st.metric("Total Protocol Revenue (Visible + Hidden)", f"${current:,.2f}")
-        
-        st.info("💡 Insight: High volatility leads to 'Stuck Fees' in AMMs. This dashboard sees them 3-7 days before they are claimed and visible to the public.")
-        
-        fig_rev = px.line(df_rev, x='timestamp', y='admin_fee_balance', markers=True, 
-                          title="Total Revenue Trend (Pre-Burn Assets)", template="plotly_dark")
-        st.plotly_chart(fig_rev, width='stretch')
+    if not df.empty and 'pool_name' in df.columns:
+        df_rev = df[df['pool_name'] == 'INSTITUTIONAL_PENDING_REVENUE'].sort_values('timestamp')
+        if not df_rev.empty:
+            current = df_rev['admin_fee_balance'].iloc[-1]
+            st.metric("Total Protocol Revenue (Visible + Hidden)", f"${current:,.2f}")
+            st.info("💡 Insight: High volatility leads to 'Stuck Fees' in AMMs. This dashboard sees them 3-7 days before they are claimed and visible to the public.")
+            fig_rev = px.line(df_rev, x='timestamp', y='admin_fee_balance', markers=True, 
+                              title="Total Revenue Trend (Pre-Burn Assets)", template="plotly_dark")
+            st.plotly_chart(fig_rev, width='stretch')
+        else:
+            st.info("No revenue history found yet.")
+    else:
+        st.info("Waiting for first data cycle from Collector...")
 
 st.sidebar.markdown("---")
 if st.sidebar.button("Refresh"): st.rerun()
