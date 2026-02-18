@@ -63,7 +63,9 @@ COLLATERAL_INFO = {
     "0xac3E018457B222d93114458476f3E3416Abbe38F": {"symbol": "sfrxETH", "decimals": 18, "coingecko": "staked-frax-ether"},
     "0xD533a949740bb3306d119CC777fa900bA034cd52": {"symbol": "CRV", "decimals": 18, "coingecko": "curve-dao-token"},
     "0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B": {"symbol": "CVX", "decimals": 18, "coingecko": "convex-finance"},
-    "0x8085ab9939352133224c45a703248880a367c541": {"symbol": "PENDLE", "decimals": 18, "coingecko": "pendle"}
+    "0x8085ab9939352133224c45a703248880a367c541": {"symbol": "PENDLE", "decimals": 18, "coingecko": "pendle"},
+    "0x40D16FC02446E4894E0474d912051e893cfb7E25": {"symbol": "GHO", "decimals": 18, "coingecko": "gho"},
+    "0x6c3ea9036406852006290770bedfc107f913665e": {"symbol": "PYUSD", "decimals": 6, "coingecko": "paypal-usd"}
 }
 
 def get_prices():
@@ -237,10 +239,22 @@ def check_arbi_opportunities():
     conn.close()
 
 def run_cycle():
+    from db import init_db
+    init_db()
+    
+    print(f"--- [v4.8] DEEP SCAN START at {time.strftime('%H:%M:%S')} ---")
     get_classic_pools()
     get_alpha_and_fees()
     check_arbi_opportunities()
-    print(f"Cycle Complete at {time.strftime('%H:%M:%S')}")
+    
+    # Summary for the user
+    try:
+        factory = w3.eth.contract(address=w3.to_checksum_address(LLAMALEND_FACTORY), abi=LLAMALEND_FACTORY_ABI)
+        n = factory.functions.n_collaterals().call()
+        print(f"TERMINAL STATUS: Tracking {n} Lending Markets & {len(CLASSIC_POOLS)} Prime Pools.")
+    except: pass
+    
+    print(f"--- [v4.8] CYCLE COMPLETE ---")
 
 if __name__ == "__main__":
     if os.environ.get("GITHUB_ACTIONS") == "true":

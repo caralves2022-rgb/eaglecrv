@@ -117,6 +117,18 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# Terminal Analytics
+if not df_status.empty:
+    df_m, _ = get_data("lending_markets", limit=50)
+    n_markets = df_m['market_name'].nunique() if not df_m.empty else 0
+    st.sidebar.markdown(f"""
+    <div style='margin-top:10px; padding:10px; border-radius:5px; background:rgba(67, 133, 245, 0.05); border:1px solid rgba(67, 133, 245, 0.2)'>
+        <div style='font-size:10px; color:#8b949e'>TERMINAL COVERAGE</div>
+        <div style='font-size:14px; font-weight:bold; color:#58a6ff'>📡 {n_markets} Markets Tracking</div>
+        <div style='font-size:12px; color:#8b949e'>Deep Scan: 5 min interval</div>
+    </div>
+    """, unsafe_allow_html=True)
+
 if db_t != "postgres":
     st.sidebar.warning("⚠️ Cloud DB not connected. Go to Settings -> Secrets.")
 
@@ -259,4 +271,4 @@ elif mode == "💎 Revenue Alpha":
 st.sidebar.markdown("---")
 if st.sidebar.button("Refresh"): st.rerun()
 st.sidebar.info("System Status: Operational")
-st.sidebar.caption(f"Engine v4.5 | {time.strftime('%H:%M:%S')}")
+st.sidebar.caption(f"Engine v4.8 | {time.strftime('%H:%M:%S')}")
