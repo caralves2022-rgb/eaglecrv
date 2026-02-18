@@ -146,11 +146,15 @@ elif mode == "💰 Arbitrage Checker":
             badge_class = "badge-green" if profitable else "badge-red"
             badge_text = f"+${row['est_profit_per_1k']:,.2f} / $1k" if profitable else f"${row['est_profit_per_1k']:,.2f} / $1k"
             verdict = "PROFITABLE" if profitable else "NOT PROFITABLE"
+            market_label = f"{row['collateral_symbol']} ({row['market_name']})"
 
             st.markdown(f"""
             <div class="arbi-card {card_class}">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin:0; color: #f0f6fc;">{row['collateral_symbol']}</h3>
+                    <div style="display: flex; align-items: baseline; gap: 8px;">
+                        <h3 style="margin:0; color: #f0f6fc;">{market_label}</h3>
+                        <span style="font-size: 11px; color: #8b949e;">updated {row['timestamp'].split(' ')[1]}</span>
+                    </div>
                     <span class="profit-badge {badge_class}">{verdict}: {badge_text}</span>
                 </div>
                 <hr style="border-color: #30363d; margin: 8px 0;">

@@ -187,11 +187,15 @@ def check_arbi_opportunities():
                 amm_addr = ctrl.functions.amm().call()
                 amm = w3.eth.contract(address=amm_addr, abi=AMM_ABI)
                 p_band_up = amm.functions.p_oracle_up(amm.functions.active_band().call()).call() / 1e18
-                market_price = get_market_price_coingecko("ethereum") # simplified for test
+                info = COLLATERAL_INFO.get(collat_addr, {"symbol": "Unknown", "coingecko": "ethereum"})
+                symbol = info["symbol"]
+                market_price = get_market_price_coingecko(info["coingecko"])
+                
                 discount_pct = ((market_price - p_band_up) / market_price) * 100
                 net_profit = ((1000.0 / p_band_up) * market_price - 1000.0) - (gas_cost * 2)
+                
                 cursor.execute(f"INSERT INTO arbi_opportunities (timestamp, market_name, collateral_symbol, curve_price_usd, market_price_usd, discount_pct, est_profit_per_1k, gas_cost_usd, is_profitable) VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})",
-                    (now, "Market", "ETH", float(p_band_up), float(market_price), float(discount_pct), float(net_profit), float(gas_cost * 2), 1 if net_profit > 0 else 0))
+                    (now, f"Market #{i}", symbol, float(p_band_up), float(market_price), float(discount_pct), float(net_profit), float(gas_cost * 2), 1 if net_profit > 0 else 0))
             except: pass
     except: pass
     conn.commit()
