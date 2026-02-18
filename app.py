@@ -59,6 +59,16 @@ st.markdown("""
     .arbi-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 14px; }
     .arbi-label { color: #8b949e; }
     .arbi-value { color: #f0f6fc; font-family: 'JetBrains Mono', monospace; }
+    
+    /* Airport Terminal Animation */
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .status-alert {
+        animation: slideIn 0.5s ease-out forwards;
+        margin-bottom: 8px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -108,28 +118,36 @@ if db_t != "postgres":
 
 if mode == "📡 Liquidation Radar":
     st.header("📡 Institutional Alpha: LlamaLend Radar")
-    df, _ = get_data("lending_markets", limit=200)
+    df, _ = get_data("lending_markets", limit=500)
     if not df.empty:
-        # Group by market and show history
-        markets = df['market_name'].unique()
-        for market in markets:
+        # 1. Show the Proximity Graph (Restored)
+        m_list = df['market_name'].unique()
+        latest_data = []
+        for m in m_list:
+            latest_data.append(df[df['market_name'] == m].iloc[0])
+        df_latest = pd.DataFrame(latest_data)
+        
+        fig = px.bar(df_latest, x='market_name', y='band_proximity', color='band_proximity',
+                     color_continuous_scale="RdYlGn_r", template="plotly_dark", height=300,
+                     title="Market Health (Higher = Safer)")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # 2. Show Live Feed with Airport Effect
+        st.subheader("Live Market Feed")
+        for market in m_list:
             m_df = df[df['market_name'] == market].sort_values('timestamp', ascending=False)
             row = m_df.iloc[0]
             prox = row['band_proximity']
-            ts = row['timestamp']
+            ts = row['timestamp'].split(' ')[1] # Just time
             
             if prox < 0:
-                st.markdown(f'<div class="alert-arb">⚠️ [{ts}] ARBITRAGE: {market} at {prox:.2f}%. Buy discount asset in Pool. <a href="https://curve.fi/#/ethereum/swap" class="swap-btn" target="_blank">SWAP UI</a></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="alert-arb status-alert">⚠️ [{ts}] ARBITRAGE: {market} at {prox:.2f}%. Buy discount asset in Pool. <a href="https://curve.fi/#/ethereum/swap" class="swap-btn" target="_blank">SWAP UI</a></div>', unsafe_allow_html=True)
             elif prox < 5.0:
-                st.markdown(f'<div class="alert-lend">⚡ [{ts}] HIGH YIELD: {market} at {prox:.2f}%. Borrow rates spiking. Supply crvUSD now!</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="alert-lend status-alert">⚡ [{ts}] HIGH YIELD: {market} at {prox:.2f}%. Borrow rates spiking. Supply crvUSD now!</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="alert-safe">✅ [{ts}] STABLE: {market} (+{prox:.2f}%). Safe for LP / Lending.</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="alert-safe status-alert">✅ [{ts}] STABLE: {market} (+{prox:.2f}%). Safe for LP / Lending.</div>', unsafe_allow_html=True)
     else:
-        st.info("Waiting for first data cycle from Collector v4.0...")
-
-        fig = px.bar(latest, x='market_name', y='band_proximity', color='band_proximity',
-                     color_continuous_scale="RdYlGn_r", template="plotly_dark", height=400)
-        st.plotly_chart(fig, width='stretch')
+        st.info("Waiting for first data cycle from Collector v4.1...")
 
 elif mode == "💰 Arbitrage Checker":
     st.header("💰 Arbitrage Profitability Checker")
@@ -222,4 +240,5 @@ elif mode == "💎 Revenue Alpha":
 
 st.sidebar.markdown("---")
 if st.sidebar.button("Refresh"): st.rerun()
-st.sidebar.caption(f"Engine v2.2 | {time.strftime('%H:%M:%S')}")
+st.sidebar.info("System Status: Operational")
+st.sidebar.caption(f"Engine v4.1 | {time.strftime('%H:%M:%S')}")
