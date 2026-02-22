@@ -73,6 +73,15 @@ st.markdown("""
         animation: slideIn 0.5s ease-out forwards;
         margin-bottom: 8px !important;
     }
+    .intel-box {
+        background: rgba(88, 166, 255, 0.05);
+        border: 1px solid rgba(88, 166, 255, 0.2);
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    .intel-title { color: #58a6ff; font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+    .intel-body { color: #e1e4e8; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -175,12 +184,15 @@ elif mode == "💰 Arbitrage Checker":
     st.header("💰 Arbitrage Profitability Checker")
     st.caption("Buy discounted collateral on Curve LLAMMA, sell at fair market price.")
 
-    df_arbi, _ = get_data("arbi_opportunities", limit=50)
+    df_arbi, _ = get_data("arbi_opportunities", limit=500)
     if not df_arbi.empty:
-        latest_ts = df_arbi['timestamp'].iloc[0]
-        latest = df_arbi[df_arbi['timestamp'] == latest_ts]
-
-        for _, row in latest.iterrows():
+        # Latest per Market logic (same as Radar)
+        m_list = df_arbi['market_name'].unique()
+        for market in m_list:
+            m_df = df_arbi[df_arbi['market_name'] == market].sort_values('timestamp', ascending=False)
+            row = m_df.iloc[0]
+            
+            profitable = row['is_profitable'] == 1
             profitable = row['is_profitable'] == 1
             card_class = "arbi-profitable" if profitable else "arbi-unprofitable"
             badge_class = "badge-green" if profitable else "badge-red"
@@ -230,6 +242,27 @@ elif mode == "🌊 Liquidity & Peg":
                             color_discrete_sequence=["#58a6ff", "#3fb950", "#f2cc60", "#f85149"])
             fig_3p.update_traces(textposition='inside')
             st.plotly_chart(fig_3p, width='stretch')
+
+            # Intelligence Note for 3Pool
+            usdt_row = latest_3p[latest_3p['token_symbol'] == 'USDT']
+            if not usdt_row.empty:
+                usdt_pct = usdt_row['percentage'].iloc[0]
+                if usdt_pct > 60:
+                    status = "🔴 CRITICAL IMBALANCE"
+                    advice = "USDT is crowding out DAI/USDC. Significant whale exits detected. High risk of volatility."
+                elif usdt_pct > 50:
+                    status = "🟡 MODERATE IMBALANCE"
+                    advice = "USDT dominance rising. Markets are slightly leaning towards caution. Monitor the 62% threshold."
+                else:
+                    status = "🟢 NORMAL COMPOSITION"
+                    advice = "Pool is healthy and balanced. Liquidity is stable for swap operations."
+                
+                st.markdown(f"""
+                <div class="intel-box">
+                    <div class="intel-title">🧠 Intelligence Insight: {status}</div>
+                    <div class="intel-body">USDT Dominance: <b>{usdt_pct:.2f}%</b>. {advice}</div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.info("3Pool data pending...")
         
@@ -244,6 +277,27 @@ elif mode == "🌊 Liquidity & Peg":
                             color_discrete_sequence=["#3fb950", "#58a6ff"])
             fig_cv.update_traces(textposition='inside')
             st.plotly_chart(fig_cv, width='stretch')
+
+            # Intelligence Note for crvUSD
+            cv_row = latest_cv[latest_cv['token_symbol'] == 'crvUSD']
+            if not cv_row.empty:
+                cv_pct = cv_row['percentage'].iloc[0]
+                if cv_pct > 60:
+                    status = "⚠️ DE-PEG PRESSURE (Low)"
+                    advice = "Excess crvUSD in pool. People are selling crvUSD for USDC. Price may be slightly under $1.00."
+                elif cv_pct < 40:
+                    status = "⚡ HIGH DEMAND"
+                    advice = "crvUSD is being bought heavily. Price likely trading at a premium (>$1.00). Good for minters."
+                else:
+                    status = "✅ PERFECT PEG"
+                    advice = "Supply and demand are perfectly balanced at $1.00."
+
+                st.markdown(f"""
+                <div class="intel-box" style="border-color: rgba(63, 185, 80, 0.2);">
+                    <div class="intel-title" style="color: #3fb950;">🧠 Peg Analytics: {status}</div>
+                    <div class="intel-body">crvUSD Concentration: <b>{cv_pct:.2f}%</b>. {advice}</div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.info("crvUSD Peg data pending...")
     else:
@@ -271,4 +325,4 @@ elif mode == "💎 Revenue Alpha":
 st.sidebar.markdown("---")
 if st.sidebar.button("Refresh"): st.rerun()
 st.sidebar.info("System Status: Operational")
-st.sidebar.caption(f"Engine v4.8 | {time.strftime('%H:%M:%S')}")
+st.sidebar.caption(f"Engine v5.0 | {time.strftime('%H:%M:%S')}")
